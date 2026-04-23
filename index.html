@@ -896,9 +896,8 @@ import { getDatabase, ref, set, get, onValue, push, serverTimestamp }
                                                     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
   getAuth, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signInWithRedirect,
-  getRedirectResult, GoogleAuthProvider,
-  signOut, onAuthStateChanged, updateProfile
+  signInWithEmailAndPassword, signInWithPopup,
+  GoogleAuthProvider, signOut, onAuthStateChanged, updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ── Firebase ── */
@@ -1106,11 +1105,33 @@ window.doRegister = async function() {
 
 window.doGoogle = async function() {
   document.getElementById('loginErr').classList.remove('show');
+  const btn = document.querySelector('.btn-google');
+  if(btn) btn.style.opacity = '0.6';
   try {
-    await signInWithRedirect(auth, gProv);
+    const result = await signInWithPopup(auth, gProv);
+    const u = result.user;
+    // حفظ بيانات المستخدم في Firebase
+    await set(ref(db,'users/'+u.uid), {
+      name: u.displayName||u.email,
+      username: u.email,
+      email: u.email,
+      photoURL: u.photoURL||'',
+      lastLogin: Date.now(),
+      provider: 'google',
+      role: 'user'
+    });
+    // onAuthStateChanged بتتولى الباقي
   } catch(e) {
-    if(e.code !== 'auth/popup-closed-by-user')
-      showErr(`❌ ${e.code==='auth/unauthorized-domain' ? (lang==='ar'?'الدومين غير مصرّح في Firebase':'Unauthorized domain') : e.message}`);
+    console.error('Google login:', e.code, e.message);
+    if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      let msg = e.message;
+      if(e.code === 'auth/unauthorized-domain')
+        msg = lang==='ar' ? 'الدومين غير مصرّح في Firebase Console' : 'Domain not authorized in Firebase';
+      else if(e.code === 'auth/popup-blocked')
+        msg = lang==='ar' ? 'المتصفح حجب النافذة — اسمح بالـ popups' : 'Popup blocked — allow popups';
+      showErr(`❌ ${msg}`);
+    }
+    if(btn) btn.style.opacity = '1';
   }
 };
 
@@ -1118,20 +1139,6 @@ async function resolveEmail(username) {
   // لا نقرأ من Firebase قبل الدخول — نبني الإيميل مباشرة
   return username + '@pharmapp.local';
 }
-
-// Google redirect result
-getRedirectResult(auth).then(async r => {
-  if(r?.user) {
-    const u = r.user;
-    await set(ref(db,'users/'+u.uid), {
-      name: u.displayName||u.email, username:u.email, email:u.email,
-      photoURL: u.photoURL||'', lastLogin:Date.now(), provider:'google', role:'user'
-    });
-  }
-}).catch(e => {
-  if(e.code==='auth/unauthorized-domain')
-    showErr(lang==='ar'?'❌ الدومين غير مصرّح به في Firebase':'❌ Unauthorized domain in Firebase');
-});
 
 // Auth state
 let appStarted = false;
@@ -1540,22 +1547,19 @@ function clearSchTimers() { schTimers.forEach(clearInterval); schTimers=[]; }
 
 function fireAlarm(sch) {
   showToast('🔔', t('medTime'), `${sch.name} — ${lang==='ar'?'درج':'Drawer'} ${sch.drawer}`, 'med');
-  if(Notification.permission==='granted') {
-    new Notification(t('medTime'), { body:`${sch.name} — Drawer ${sch.drawer}` });
-  } else if(Notification.permission!=='denied') {
-    Notification.requestPermission().then(p => {
-      if(p==='granted') new Notification(t('medTime'), { body:`${sch.name}` });
-    });
+  // نطلب الإذن فقط لما يحين موعد دواء — مش عند التحميل
+  const doNotif = () => new Notification(t('medTime'), { body:`${sch.name} — Drawer ${sch.drawer}` });
+  if(Notification.permission === 'granted') {
+    doNotif();
+  } else if(Notification.permission === 'default') {
+    Notification.requestPermission().then(p => { if(p==='granted') doNotif(); });
   }
-  // Send to Firebase
   set(ref(db,'alarm'), {
     name:sch.name, drawer:sch.drawer, time:sch.time,
     triggered_at:Date.now(), user:currentUser?.uid||'guest',
     time_text: new Date().toLocaleString('ar-EG')
   });
 }
-
-Notification.requestPermission?.();
 
 /* ════════════════════════════════════════════
    HEALTH PAGE — Firebase editable content
