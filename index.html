@@ -1115,13 +1115,7 @@ window.doGoogle = async function() {
 };
 
 async function resolveEmail(username) {
-  try {
-    const snap = await get(ref(db,'users'));
-    if(snap.exists()) {
-      const found = Object.values(snap.val()).find(u=>u.username===username);
-      if(found) return found.email;
-    }
-  } catch(e) {}
+  // لا نقرأ من Firebase قبل الدخول — نبني الإيميل مباشرة
   return username + '@pharmapp.local';
 }
 
@@ -1139,19 +1133,19 @@ getRedirectResult(auth).then(async r => {
     showErr(lang==='ar'?'❌ الدومين غير مصرّح به في Firebase':'❌ Unauthorized domain in Firebase');
 });
 
-// Auth state — نستخدم flag عشان نمنع الوميض عند التحميل
-let authResolved = false;
+// Auth state
+let appStarted = false;
 
 onAuthStateChanged(auth, async fbUser => {
-  // أول مرة يُحلّ فيها الـ auth state
-  if(!authResolved) {
-    authResolved = true;
-    // أخفي شاشة التحميل
-    const splash = document.getElementById('authSplash');
-    if(splash) splash.style.display = 'none';
-  }
+  // أخفي splash في كل الأحوال
+  const splash = document.getElementById('authSplash');
+  if(splash) splash.style.display = 'none';
 
   if(fbUser) {
+    // منع تشغيل initApp أكثر من مرة
+    const wasStarted = appStarted;
+    appStarted = true;
+
     let udata = { name:fbUser.displayName||fbUser.email, username:fbUser.email, uid:fbUser.uid, email:fbUser.email };
     try {
       const snap = await get(ref(db,'users/'+fbUser.uid));
@@ -1161,19 +1155,19 @@ onAuthStateChanged(auth, async fbUser => {
     currentUser = udata;
     isAdmin = (fbUser.email === ADMIN_EMAIL);
 
-    // Load API key from Firebase
+    // Load API key
     try {
       const apiSnap = await get(ref(db,'config/apiKey'));
       if(apiSnap.exists()) apiKey = apiSnap.val();
     } catch(e) { apiKey = localStorage.getItem('pharmApiKey') || ''; }
 
-    // Load medicines from Firebase
+    // Load medicines
     try {
       const medSnap = await get(ref(db,'config/medicines'));
       if(medSnap.exists()) medicines = medSnap.val();
     } catch(e) {}
 
-    // Load health content from Firebase
+    // Load health content
     await loadHealthContent();
 
     // Load schedules
@@ -1182,8 +1176,11 @@ onAuthStateChanged(auth, async fbUser => {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('app').classList.add('on');
     updateUserUI();
-    initApp();
+
+    if(!wasStarted) initApp();
+
   } else {
+    appStarted = false;
     currentUser = null; isAdmin = false;
     document.getElementById('app').classList.remove('on');
     document.getElementById('loginPage').style.display = 'flex';
