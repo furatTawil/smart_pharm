@@ -547,6 +547,22 @@ button,input,textarea,select{font-family:inherit}
 <div id="bgGrid"></div>
 <div id="toasts"></div>
 
+<!-- شاشة تحميل مؤقتة حتى يتحقق Firebase من الجلسة -->
+<div id="authSplash" style="
+  position:fixed;inset:0;z-index:99999;
+  background:var(--bg-0,#050a18);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;
+">
+  <div style="font-size:48px;animation:float 2s ease-in-out infinite">💊</div>
+  <div style="font-size:14px;color:#7a9bbf;letter-spacing:1px;">Smart Pharmacy Pro</div>
+  <div style="display:flex;gap:6px;margin-top:8px;">
+    <div style="width:7px;height:7px;border-radius:50%;background:#00d4ff;animation:bounce 1.2s infinite"></div>
+    <div style="width:7px;height:7px;border-radius:50%;background:#00d4ff;animation:bounce 1.2s .2s infinite"></div>
+    <div style="width:7px;height:7px;border-radius:50%;background:#00d4ff;animation:bounce 1.2s .4s infinite"></div>
+  </div>
+</div>
+
 <!-- ════════════════════════════════════════════
      LOGIN PAGE
 ════════════════════════════════════════════ -->
@@ -1043,11 +1059,20 @@ window.doLogin = async function() {
   const user = document.getElementById('liUser').value.trim();
   const pass = document.getElementById('liPass').value;
   if(!user || !pass) return;
+
+  // Disable button during login
+  const btn = document.querySelector('#formIn .btn-primary');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ ...'; }
+  document.getElementById('loginErr').classList.remove('show');
+
   try {
     const email = user.includes('@') ? user : await resolveEmail(user);
     await signInWithEmailAndPassword(auth, email, pass);
+    // onAuthStateChanged بتتولى الباقي تلقائياً
   } catch(e) {
+    console.error('Login error:', e.code);
     showErr(lang==='ar' ? '❌ بيانات الدخول غير صحيحة' : '❌ Invalid credentials');
+    if(btn) { btn.disabled = false; btn.innerHTML = '<span data-ar="🔓 دخول" data-en="🔓 Login">🔓 دخول</span>'; }
   }
 };
 
@@ -1057,6 +1082,11 @@ window.doRegister = async function() {
   const pass = document.getElementById('ruPass').value;
   if(!name||!user||!pass) return alert(lang==='ar'?'يرجى ملء جميع الحقول':'Fill all fields');
   if(pass.length < 6) return alert(lang==='ar'?'كلمة المرور 6 أحرف على الأقل':'Min 6 chars');
+
+  const btn = document.querySelector('#formUp .btn-primary');
+  if(btn) { btn.disabled=true; btn.textContent='⏳ ...'; }
+  document.getElementById('loginErr').classList.remove('show');
+
   const email = user + '@pharmapp.local';
   try {
     const c = await createUserWithEmailAndPassword(auth, email, pass);
@@ -1064,10 +1094,13 @@ window.doRegister = async function() {
     await set(ref(db,'users/'+c.user.uid), {
       name, username:user, email, createdAt: Date.now(), provider:'email', role:'user'
     });
+    // onAuthStateChanged بتتولى الباقي
   } catch(e) {
+    console.error('Register error:', e.code);
     showErr(e.code==='auth/email-already-in-use'
       ? (lang==='ar'?'❌ اسم المستخدم موجود':'❌ Username taken')
       : `❌ ${e.code}`);
+    if(btn) { btn.disabled=false; btn.innerHTML='<span data-ar="✅ إنشاء حساب" data-en="✅ Create Account">✅ إنشاء حساب</span>'; }
   }
 };
 
@@ -1106,8 +1139,18 @@ getRedirectResult(auth).then(async r => {
     showErr(lang==='ar'?'❌ الدومين غير مصرّح به في Firebase':'❌ Unauthorized domain in Firebase');
 });
 
-// Auth state
+// Auth state — نستخدم flag عشان نمنع الوميض عند التحميل
+let authResolved = false;
+
 onAuthStateChanged(auth, async fbUser => {
+  // أول مرة يُحلّ فيها الـ auth state
+  if(!authResolved) {
+    authResolved = true;
+    // أخفي شاشة التحميل
+    const splash = document.getElementById('authSplash');
+    if(splash) splash.style.display = 'none';
+  }
+
   if(fbUser) {
     let udata = { name:fbUser.displayName||fbUser.email, username:fbUser.email, uid:fbUser.uid, email:fbUser.email };
     try {
@@ -1118,7 +1161,7 @@ onAuthStateChanged(auth, async fbUser => {
     currentUser = udata;
     isAdmin = (fbUser.email === ADMIN_EMAIL);
 
-    // Load API key from Firebase (only works when logged in with valid rules)
+    // Load API key from Firebase
     try {
       const apiSnap = await get(ref(db,'config/apiKey'));
       if(apiSnap.exists()) apiKey = apiSnap.val();
@@ -1795,7 +1838,8 @@ document.getElementById('healthModal').addEventListener('click',function(e){if(e
 /* ════════════════════════════════════════════
    BOOT
 ════════════════════════════════════════════ */
-document.getElementById('loginPage').style.display = 'flex';
+// أخفي كل شيء في البداية — authSplash بتشتغل حتى Firebase يرجع
+document.getElementById('loginPage').style.display = 'none';
 document.getElementById('app').classList.remove('on');
 setLang(lang);
 applyTheme(theme);
