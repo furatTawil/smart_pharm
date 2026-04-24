@@ -8,7 +8,7 @@ const STATIC_CACHE = 'pharmacy-static-v1';
 
 // الملفات اللي نحفظها للعمل بدون انترنت
 const ASSETS_TO_CACHE = [
-  './smart_pharmacy_pro_v3.html',
+  './index.html',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Cairo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap',
 ];
@@ -83,7 +83,7 @@ self.addEventListener('fetch', event => {
         return caches.match(event.request).then(cached => {
           if (cached) return cached;
           // لو ما في كاش، رجّع الصفحة الرئيسية (SPA fallback)
-          return caches.match('./smart_pharmacy_pro_v3.html');
+          return caches.match('./index.html');
         });
       })
   );
@@ -120,7 +120,7 @@ self.addEventListener('notificationclick', event => {
           return client.focus();
         }
       }
-      return clients.openWindow('./smart_pharmacy_pro_v3.html');
+      return clients.openWindow('./index.html');
     })
   );
 });
