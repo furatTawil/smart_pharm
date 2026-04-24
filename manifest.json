@@ -2,7 +2,7 @@
   "name": "Smart Pharmacy Pro",
   "short_name": "PharmaPro",
   "description": "صيدليتك الذكية المتكاملة — Smart Pharmacy System",
-  "start_url": "./smart_pharmacy_pro_v3.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -36,13 +36,13 @@
     {
       "name": "المساعد الذكي",
       "short_name": "Chat",
-      "url": "./smart_pharmacy_pro_v3.html#chat",
+      "url": "./index.html#chat",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "مواعيد الدواء",
       "short_name": "Schedule",
-      "url": "./smart_pharmacy_pro_v3.html#schedule",
+      "url": "./index.html#schedule",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     }
   ]
