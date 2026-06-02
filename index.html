@@ -2154,9 +2154,11 @@ window.testWhatsApp = async function() {
 const _origOpenSettings = window.openSettings;
 window.openSettings = function() {
   _origOpenSettings && _origOpenSettings();
-  getWaPhone().then(p => { if(p) { const el=document.getElementById('cfgWaPhone'); if(el) el.value=p; } });
+  getWaPhone().then(p  => { if(p) { const el=document.getElementById('cfgWaPhone'); if(el) el.value=p; } });
   getWaApiKey().then(k => { if(k) { const el=document.getElementById('cfgWaKey');   if(el) el.value=k; } });
 };
+
+window.addMedEntry = function() {
   medicines.push({ id:Date.now(), name:'', drawer:medicines.length+1, aliases:[] });
   renderMedsSettings();
 };
@@ -2198,8 +2200,6 @@ window.saveSettingsAndClose = async function() {
     try {
       if(waPhone) await set(ref(db,'config/waPhone'), waPhone);
       if(waKey)   await set(ref(db,'config/waApiKey'), waKey);
-    } catch(e){}
-  }
       await set(ref(db, `users/${currentUser.uid}/medicines`), medicines);
       showToast('✅', lang==='ar'?'تم حفظ الأدوية':'Medicines Saved',
         lang==='ar'?`${medicines.length} دواء محفوظ`:`${medicines.length} medicines saved`, 'success');
