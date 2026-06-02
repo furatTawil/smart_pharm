@@ -495,6 +495,27 @@ button,input,textarea,select{font-family:inherit}
 .btn-ghost:hover{border-color:var(--border-h);color:var(--text)}
 
 /* ════════════════════════════════════════════
+   CARE PAGE
+════════════════════════════════════════════ */
+.mood-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;transition:all var(--tr);font-family:var(--font);}
+.mood-btn.selected{border-color:var(--primary);background:rgba(0,212,255,0.12);color:var(--primary)}
+.taken-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);padding:13px;display:flex;align-items:center;gap:12px;animation:fadeUp .25s ease;}
+.taken-card .tc-icon{font-size:22px;flex-shrink:0}
+.taken-card .tc-info{flex:1}
+.taken-card .tc-name{font-size:14px;font-weight:700}
+.taken-card .tc-time{font-size:11px;color:var(--text-2);margin-top:2px}
+.taken-card.confirmed{border-color:rgba(0,255,157,0.3);background:rgba(0,255,157,0.04)}
+.care-hist-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);padding:12px;display:flex;gap:10px;align-items:flex-start;}
+.care-hist-card .ch-mood{font-size:22px;flex-shrink:0}
+.care-hist-card .ch-info{flex:1}
+.care-hist-card .ch-date{font-size:11px;color:var(--text-2);margin-bottom:3px}
+.care-hist-card .ch-notes{font-size:13px;line-height:1.5}
+.btn-confirm{padding:7px 14px;background:linear-gradient(135deg,var(--green),#009966);color:#000;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;flex-shrink:0;}
+.btn-confirm:disabled{opacity:.5;cursor:not-allowed}
+.med-confirm-btn{margin-top:10px;width:100%;padding:10px;background:linear-gradient(135deg,var(--green),#009966);color:#000;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px;}
+.med-confirm-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ════════════════════════════════════════════
    TOAST
 ════════════════════════════════════════════ */
 #toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99999;width:90%;max-width:360px;display:flex;flex-direction:column;gap:7px;pointer-events:none}
@@ -633,6 +654,7 @@ button,input,textarea,select{font-family:inherit}
       <div class="sbi active" onclick="goPage('chat')"     data-page="chat"><span class="si">🤖</span><span data-i18n="chatbot">المساعد الذكي</span></div>
       <div class="sbi"        onclick="goPage('schedule')" data-page="schedule"><span class="si">⏰</span><span data-i18n="schedule">مواعيد الدواء</span></div>
       <div class="sbi"        onclick="goPage('health')"   data-page="health"><span class="si">🏥</span><span data-i18n="health">الصحة والتوعية</span></div>
+      <div class="sbi"        onclick="goPage('care')"     data-page="care"><span class="si">❤️</span><span data-i18n="care">عنايتي الشخصية</span></div>
       <div class="sbi" id="adminSbItem" style="display:none" onclick="goPage('admin')" data-page="admin"><span class="si">🛡️</span><span data-i18n="admin">لوحة الإدارة</span></div>
     </nav>
     <div class="sb-foot">
@@ -746,6 +768,57 @@ button,input,textarea,select{font-family:inherit}
         </div>
       </div>
 
+      <!-- ── CARE (صفحة العناية الشخصية) ── -->
+      <div class="page" id="carePage">
+        <div class="phd">
+          <h2>❤️ <span data-i18n="care">عنايتي الشخصية</span></h2>
+          <p data-i18n="careDesc">سجّل حالتك وتابع أدويتك اليومية</p>
+        </div>
+        <div class="health-body">
+
+          <!-- بطاقة الحالة اليومية -->
+          <div class="card">
+            <h3>📋 <span data-i18n="dailyStatus">حالتي اليوم</span></h3>
+            <div class="fgrid">
+              <div class="ff full">
+                <label data-i18n="moodLabel">كيف تشعر اليوم؟</label>
+                <div id="moodPicker" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+                  <button class="mood-btn" data-mood="great" onclick="pickMood(this)">😄 ممتاز</button>
+                  <button class="mood-btn" data-mood="good"  onclick="pickMood(this)">🙂 جيد</button>
+                  <button class="mood-btn" data-mood="ok"    onclick="pickMood(this)">😐 مقبول</button>
+                  <button class="mood-btn" data-mood="bad"   onclick="pickMood(this)">😞 سيء</button>
+                  <button class="mood-btn" data-mood="sick"  onclick="pickMood(this)">🤒 مريض</button>
+                </div>
+              </div>
+              <div class="ff full">
+                <label data-i18n="notesLabel">ملاحظات صحية</label>
+                <textarea id="careNotes" style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;min-height:80px;resize:vertical;direction:rtl;text-align:right;" placeholder="مثلاً: صداع خفيف، أخذت الدواء الصباح..."></textarea>
+              </div>
+            </div>
+            <button class="btn-add" style="margin-top:12px;" onclick="saveDailyStatus()">💾 <span data-i18n="saveStatus">حفظ الحالة</span></button>
+          </div>
+
+          <!-- سجل الأدوية المأخوذة اليوم -->
+          <div>
+            <div class="sec-row">
+              <span data-i18n="todayMeds">أدويتي المأخوذة اليوم</span>
+              <small id="takenCount">0 <span data-i18n="dose">جرعة</span></small>
+            </div>
+            <div id="takenList" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <!-- سجل الحالات السابقة -->
+          <div>
+            <div class="sec-row">
+              <span data-i18n="careHistory">سجل العناية</span>
+              <small id="careHistCount"></small>
+            </div>
+            <div id="careHistList" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+        </div>
+      </div>
+
       <!-- ── ADMIN ── -->
       <div class="page" id="adminPage">
         <div class="phd">
@@ -824,6 +897,7 @@ button,input,textarea,select{font-family:inherit}
       <div class="bni active" onclick="goPage('chat')"     data-page="chat"><span class="bi">🤖</span><span class="bl" data-i18n="chatbot">المساعد</span></div>
       <div class="bni"        onclick="goPage('schedule')" data-page="schedule"><span class="bi">⏰</span><span class="bl" data-i18n="schedule">المواعيد</span></div>
       <div class="bni"        onclick="goPage('health')"   data-page="health"><span class="bi">🏥</span><span class="bl" data-i18n="health">الصحة</span></div>
+      <div class="bni"        onclick="goPage('care')"     data-page="care"><span class="bi">❤️</span><span class="bl" data-i18n="care">عنايتي</span></div>
       <div class="bni" id="adminBnItem" style="display:none" onclick="goPage('admin')" data-page="admin"><span class="bi">🛡️</span><span class="bl" data-i18n="admin">الإدارة</span></div>
       <div class="bni"        onclick="openSettings()"><span class="bi">⚙️</span><span class="bl" data-i18n="settings">الإعدادات</span></div>
     </div>
@@ -977,6 +1051,11 @@ const T = {
     welcome:'مرحباً! أنا مساعدك الصيدلاني الذكي.\nأخبرني بأعراضك وسأقترح الدواء المناسب من الصيدلية.',
     medTime:'حان موعد دوائك', drawerOpened:'تم فتح الدرج',
     listening:'🎤 جاري الاستماع...',
+    care:'عنايتي الشخصية', careDesc:'سجّل حالتك وتابع أدويتك اليومية',
+    dailyStatus:'حالتي اليوم', moodLabel:'كيف تشعر اليوم؟',
+    notesLabel:'ملاحظات صحية', saveStatus:'حفظ الحالة',
+    todayMeds:'أدويتي المأخوذة اليوم', dose:'جرعة',
+    careHistory:'سجل العناية',
   },
   en:{
     chatbot:'AI Assistant', chatbotDesc:"Describe symptoms, I'll suggest medicine",
@@ -1003,6 +1082,11 @@ const T = {
     welcome:"Hello! I'm your Smart Pharmacy Assistant.\nDescribe your symptoms and I'll suggest the right medicine.",
     medTime:'Time for your medication', drawerOpened:'Drawer opened',
     listening:'🎤 Listening...',
+    care:'My Care', careDesc:'Track your health and daily medicines',
+    dailyStatus:'My Status Today', moodLabel:'How do you feel today?',
+    notesLabel:'Health Notes', saveStatus:'Save Status',
+    todayMeds:'Medicines Taken Today', dose:'dose',
+    careHistory:'Care History',
   }
 };
 const t = k => T[lang]?.[k] ?? T.ar[k] ?? k;
@@ -1306,11 +1390,19 @@ function addMedCard(name, drawer, desc, isNone) {
   const chat = document.getElementById('chatMessages');
   const card = document.createElement('div');
   card.className = 'med-result' + (isNone?' none':'');
-  card.innerHTML = isNone
-    ? `<div class="mr-header"><span class="mr-icon">⚠️</span><span class="mr-name">${lang==='ar'?'لا يوجد دواء مناسب':'No match found'}</span></div><div class="mr-desc">${desc}</div>`
-    : `<div class="mr-header"><span class="mr-icon">💊</span><span class="mr-name">${name}</span></div>
-       <div class="mr-drawer">🗄️ ${lang==='ar'?'الدرج':'Drawer'} ${drawer}</div>
-       <div class="mr-desc">${desc}</div>`;
+  const cardId = 'mc_' + Date.now();
+  card.id = cardId;
+  if(isNone) {
+    card.innerHTML = `<div class="mr-header"><span class="mr-icon">⚠️</span><span class="mr-name">${lang==='ar'?'لا يوجد دواء مناسب':'No match found'}</span></div><div class="mr-desc">${desc}</div>`;
+  } else {
+    card.innerHTML = `
+      <div class="mr-header"><span class="mr-icon">💊</span><span class="mr-name">${name}</span></div>
+      <div class="mr-drawer">🗄️ ${lang==='ar'?'الدرج':'Drawer'} ${drawer}</div>
+      <div class="mr-desc">${desc}</div>
+      <button class="med-confirm-btn" id="cfm_${cardId}" onclick="confirmMedicineTaken('${name}',${drawer},'cfm_${cardId}')">
+        ✅ ${lang==='ar'?'تم أخذ الدواء':'I took the medicine'}
+      </button>`;
+  }
   chat.appendChild(card); chat.scrollTop=chat.scrollHeight;
 }
 
@@ -1323,16 +1415,19 @@ function addTyping() {
 }
 
 function buildSysPrompt() {
-  const medList = medicines.map(m => {
-    const al = (m.aliases||[]).join('/');
-    return `Drawer ${m.drawer}: ${m.name}${al?` (${al})`:''}`;
-  }).join('\n');
+  // دعم أكثر من دواء في نفس الدرج
+  const medList = medicines
+    .filter(m => m.name)
+    .map(m => {
+      const al = (m.aliases||[]).join('/');
+      return `Drawer ${m.drawer}: ${m.name}${al?` (${al})`:''}`;
+    }).join('\n');
   return `You are a smart pharmacy assistant. Reply ONLY in ${lang==='ar'?'Arabic':'English'}.
-Available medicines:
+Available medicines (multiple medicines can share the same drawer):
 ${medList}
 
-User describes symptoms → find best medicine → respond ONLY as:
-medicine:NAME
+User describes symptoms → find BEST matching medicine → respond ONLY as:
+medicine:EXACT_NAME
 drawer:NUMBER
 description:BRIEF_EXPLANATION
 
@@ -1378,7 +1473,7 @@ window.sendChat = async function() {
     if(!isNone) {
       set(ref(db,'medicine'), {
         name:medName, drawer, time:Date.now(),
-        time_text: new Date().toLocaleString('ar-EG'),
+        time_text: new Date().toLocaleString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}),
         user: currentUser?.uid||'guest'
       });
     }
@@ -1572,7 +1667,7 @@ function fireAlarm(sch) {
   set(ref(db,'alarm'), {
     name:sch.name, drawer:sch.drawer, time:sch.time,
     triggered_at:Date.now(), user:currentUser?.uid||'guest',
-    time_text: new Date().toLocaleString('ar-EG')
+    time_text: new Date().toLocaleString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
   });
 }
 
@@ -1890,6 +1985,126 @@ function showToast(icon, title, text, type) {
 ════════════════════════════════════════════ */
 document.getElementById('settingsModal').addEventListener('click',function(e){if(e.target===this)closeSettings()});
 document.getElementById('healthModal').addEventListener('click',function(e){if(e.target===this)closeHealthModal()});
+
+
+/* ════════════════════════════════════════════
+   CARE PAGE — صفحة العناية الشخصية
+════════════════════════════════════════════ */
+let selectedMood = '';
+
+window.pickMood = function(btn) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedMood = btn.dataset.mood;
+};
+
+const moodEmoji = { great:'😄', good:'🙂', ok:'😐', bad:'😞', sick:'🤒' };
+
+window.saveDailyStatus = async function() {
+  if(!currentUser) return;
+  const notes = document.getElementById('careNotes').value.trim();
+  if(!selectedMood && !notes) return;
+  const entry = {
+    mood: selectedMood || 'ok',
+    notes,
+    date: new Date().toLocaleDateString('en-GB'),
+    time: new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}),
+    ts: Date.now()
+  };
+  try {
+    const r = push(ref(db, `care/${currentUser.uid}/history`));
+    await set(r, entry);
+    document.getElementById('careNotes').value = '';
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    selectedMood = '';
+    showToast('❤️', lang==='ar'?'تم حفظ الحالة':'Status Saved', notes.substring(0,40)||'', 'success');
+    loadCareHistory();
+  } catch(e) {}
+};
+
+// تأكيد أخذ الدواء من زر الشات
+window.confirmMedicineTaken = async function(name, drawer, btnId) {
+  if(!currentUser) return;
+  const btn = document.getElementById(btnId);
+  if(btn) { btn.disabled = true; btn.innerHTML = '✅ ' + (lang==='ar'?'تم التسجيل!':'Recorded!'); }
+  const entry = {
+    name, drawer,
+    date: new Date().toLocaleDateString('en-GB'),
+    time: new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}),
+    ts: Date.now()
+  };
+  try {
+    const r = push(ref(db, `care/${currentUser.uid}/taken`));
+    await set(r, entry);
+    // بعت ACK للأردوينو يطفي الضوء
+    await set(ref(db, 'ack'), { name, drawer, time: Date.now(), confirmed: true });
+    showToast('✅', lang==='ar'?'تم أخذ الدواء':'Medicine Taken', `${name} — Drawer ${drawer}`, 'success');
+    loadTodayTaken();
+  } catch(e) {}
+};
+
+async function loadTodayTaken() {
+  if(!currentUser) return;
+  const list = document.getElementById('takenList'); if(!list) return;
+  const today = new Date().toLocaleDateString('en-GB');
+  try {
+    const snap = await get(ref(db, `care/${currentUser.uid}/taken`));
+    const all = snap.exists() ? Object.values(snap.val()) : [];
+    const todayItems = all.filter(x => x.date === today).sort((a,b)=>b.ts-a.ts);
+    const tc = document.getElementById('takenCount');
+    if(tc) tc.innerHTML = `${todayItems.length} <span data-i18n="dose">${lang==='ar'?'جرعة':'dose'}</span>`;
+    if(!todayItems.length) {
+      list.innerHTML = `<div class="empty"><div class="ei">💊</div><p>${lang==='ar'?'لم تأخذ أي دواء اليوم':'No medicines taken today'}</p></div>`;
+      return;
+    }
+    list.innerHTML = '';
+    todayItems.forEach(item => {
+      const d = document.createElement('div');
+      d.className = 'taken-card confirmed';
+      d.innerHTML = `
+        <div class="tc-icon">✅</div>
+        <div class="tc-info">
+          <div class="tc-name">${item.name}</div>
+          <div class="tc-time">${lang==='ar'?'الدرج':'Drawer'} ${item.drawer} · ${item.time}</div>
+        </div>`;
+      list.appendChild(d);
+    });
+  } catch(e) {}
+}
+
+async function loadCareHistory() {
+  if(!currentUser) return;
+  const list = document.getElementById('careHistList'); if(!list) return;
+  try {
+    const snap = await get(ref(db, `care/${currentUser.uid}/history`));
+    const all = snap.exists() ? Object.values(snap.val()).sort((a,b)=>b.ts-a.ts) : [];
+    const hc = document.getElementById('careHistCount');
+    if(hc) hc.textContent = `(${all.length})`;
+    if(!all.length) {
+      list.innerHTML = `<div class="empty"><div class="ei">📋</div><p>${lang==='ar'?'لا يوجد سجل بعد':'No history yet'}</p></div>`;
+      return;
+    }
+    list.innerHTML = '';
+    all.slice(0, 20).forEach(item => {
+      const d = document.createElement('div');
+      d.className = 'care-hist-card';
+      d.innerHTML = `
+        <div class="ch-mood">${moodEmoji[item.mood]||'😐'}</div>
+        <div class="ch-info">
+          <div class="ch-date">${item.date} · ${item.time}</div>
+          <div class="ch-notes">${item.notes || (lang==='ar'?'لا توجد ملاحظات':'No notes')}</div>
+        </div>`;
+      list.appendChild(d);
+    });
+  } catch(e) {}
+}
+
+// تحميل بيانات Care عند فتح الصفحة
+const _origGoPage = window.goPage;
+window.goPage = function(page) {
+  _origGoPage(page);
+  if(page === 'care') { loadTodayTaken(); loadCareHistory(); }
+};
 
 /* ════════════════════════════════════════════
    BOOT
