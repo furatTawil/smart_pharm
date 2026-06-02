@@ -726,16 +726,28 @@ button,input,textarea,select{font-family:inherit}
           <div class="card">
             <h3>➕ <span data-i18n="addSchedule">إضافة موعد</span></h3>
             <div class="fgrid">
-              <div class="ff"><label data-i18n="medicineName">اسم الدواء</label><input id="sMed" type="text" placeholder="Paracetamol"></div>
-              <div class="ff"><label data-i18n="drawerNum">رقم الدرج</label><input id="sDrw" type="number" placeholder="1" min="1"></div>
+              <div class="ff full"><label data-i18n="medicineName">اختر الدواء</label>
+                <select id="sMed" onchange="onSchedMedChange()" style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;">
+                  <option value="">-- اختر دواء --</option>
+                </select>
+              </div>
+              <div class="ff"><label data-i18n="drawerNum">الدرج</label>
+                <input id="sDrw" type="number" placeholder="1" min="1" max="4" readonly
+                  style="background:var(--bg-3);cursor:not-allowed;">
+              </div>
               <div class="ff"><label data-i18n="time">الوقت الأول</label><input id="sTime" type="time"></div>
               <div class="ff"><label data-i18n="repeat">عدد الجرعات يومياً</label>
-                <select id="sRep">
+                <select id="sRep" onchange="onRepeatChange()">
                   <option value="1x" >مرة واحدة / Once</option>
                   <option value="2x" >مرتين / Twice</option>
                   <option value="3x" >3 مرات / 3x</option>
                   <option value="once">جرعة واحدة فقط / One-time</option>
                 </select>
+              </div>
+              <!-- عرض الأوقات المحسوبة -->
+              <div class="ff full" id="calcTimesBox" style="display:none;">
+                <label>الأوقات المحسوبة</label>
+                <div id="calcTimesList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;"></div>
               </div>
               <div class="ff full"><label data-i18n="notes">ملاحظات (اختياري)</label><input id="sNote" type="text" placeholder="مثلاً: بعد الأكل"></div>
             </div>
@@ -816,6 +828,19 @@ button,input,textarea,select{font-family:inherit}
               <small id="careHistCount"></small>
             </div>
             <div id="careHistList" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <!-- تقرير الأدوية -->
+          <div>
+            <div class="sec-row">
+              <span>📊 تقرير الأدوية</span>
+              <div style="display:flex;gap:6px;">
+                <button class="mood-btn" id="rptDay"   onclick="loadReport('day')"  >يومي</button>
+                <button class="mood-btn" id="rptWeek"  onclick="loadReport('week')" >أسبوعي</button>
+                <button class="mood-btn" id="rptMonth" onclick="loadReport('month')">شهري</button>
+              </div>
+            </div>
+            <div id="reportBox" style="margin-top:8px;"></div>
           </div>
 
         </div>
@@ -926,6 +951,25 @@ button,input,textarea,select{font-family:inherit}
         </div>
         <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">يمكن وضع أكثر من دواء في نفس الدرج — حدد رقم الدرج (1-4)</p>
         <div id="medsSettingsList"></div>
+      </div>
+      <!-- WHATSAPP -->
+      <div class="set-sec">
+        <h4>📱 WhatsApp (CallMeBot)</h4>
+        <div class="fgrid">
+          <div class="ff full">
+            <label>رقم الواتساب</label>
+            <input id="cfgWaPhone" type="tel" placeholder="00972594785696"
+              style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;" dir="ltr">
+          </div>
+          <div class="ff full">
+            <label>CallMeBot API Key</label>
+            <input id="cfgWaKey" type="text" placeholder="أرسل 'I allow callmebot...' لـ wa.me/+34684875248"
+              style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;" dir="ltr">
+          </div>
+          <div class="ff full">
+            <button class="btn-ghost" style="font-size:12px;" onclick="testWhatsApp()">📤 إرسال رسالة اختبار</button>
+          </div>
+        </div>
       </div>
       <!-- THEME -->
       <div class="set-sec">
@@ -1474,10 +1518,26 @@ window.sendChat = async function() {
     addMedCard(medName, drawer, desc, isNone);
 
     if(!isNone) {
+      const timeText = new Date().toLocaleString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
       set(ref(db,'medicine'), {
         name:medName, drawer, time:Date.now(),
-        time_text: new Date().toLocaleString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}),
+        time_text: timeText, none:false,
         user: currentUser?.uid||'guest'
+      });
+    } else {
+      // أبلغ الأردوينو إنه ما في دواء مناسب
+      set(ref(db,'medicine'), {
+        name: medName||'unknown', drawer:0, time:Date.now(),
+        time_text:'', none:true,
+        user: currentUser?.uid||'guest'
+      });
+    }
+    // سجّل في سجل المحادثات للتقرير
+    if(currentUser?.uid) {
+      push(ref(db, `chatLog/${currentUser.uid}`), {
+        query: txt, medicine: medName||'none', drawer,
+        isNone, ts: Date.now(),
+        date: new Date().toLocaleDateString('en-GB')
       });
     }
   } catch(e) {
@@ -1631,34 +1691,159 @@ window.deleteSchedule = async function(fbKey) {
   } catch(e) {}
 };
 
+// حذف كل جرعات مجموعة واحدة
+window.deleteScheduleGroup = async function(keys) {
+  for(const k of keys) {
+    try {
+      await set(ref(db, `schedules/${currentUser.uid}/${k}`), null);
+    } catch(e){}
+  }
+  schedules = schedules.filter(s => !keys.includes(s.fbKey));
+  renderSchedules();
+};
+
+// populate medicine dropdown في صفحة المواعيد
+function populateSchedMedDropdown() {
+  const sel = document.getElementById('sMed');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = `<option value="">-- ${lang==='ar'?'اختر دواء':'Select medicine'} --</option>`;
+  medicines.filter(m=>m.name).forEach(m => {
+    const opt = document.createElement('option');
+    opt.value   = m.name;
+    opt.dataset.drawer = m.drawer;
+    opt.textContent = `${m.name} (${lang==='ar'?'درج':'D'}${m.drawer})`;
+    sel.appendChild(opt);
+  });
+  if(current) sel.value = current;
+}
+
+window.onSchedMedChange = function() {
+  const sel = document.getElementById('sMed');
+  const opt = sel.options[sel.selectedIndex];
+  const drw = document.getElementById('sDrw');
+  if(opt && opt.dataset.drawer) {
+    drw.value = opt.dataset.drawer;
+  }
+  updateCalcTimes();
+};
+
+window.onRepeatChange = function() { updateCalcTimes(); };
+
+function updateCalcTimes() {
+  const time   = document.getElementById('sTime').value;
+  const repeat = document.getElementById('sRep').value;
+  const box    = document.getElementById('calcTimesBox');
+  const listEl = document.getElementById('calcTimesList');
+  if(!time || !box || !listEl) return;
+
+  const addH = (base, hours) => {
+    const [h,m] = base.split(':').map(Number);
+    const nh = (h+hours)%24;
+    return `${String(nh).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  };
+  const fmt12 = t => {
+    const [h,m] = t.split(':').map(Number);
+    return `${String(h%12||12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+  };
+
+  let times = [time];
+  if(repeat==='2x') times.push(addH(time,12));
+  if(repeat==='3x') { times.push(addH(time,8)); times.push(addH(time,16)); }
+
+  if(times.length > 1) {
+    box.style.display='block';
+    listEl.innerHTML = times.map(t=>
+      `<span style="background:rgba(0,212,255,.12);border:1px solid var(--primary);
+        border-radius:6px;padding:4px 10px;font-size:12px;color:var(--primary);">${fmt12(t)}</span>`
+    ).join('');
+  } else {
+    box.style.display='none';
+  }
+}
+
+// ── WhatsApp Send ──────────────────────────────────────────────────
+async function sendWhatsApp(msg) {
+  try {
+    const phone = await getWaPhone();
+    const apiKey = await getWaApiKey();
+    if(!phone || !apiKey) return;
+    const enc = encodeURIComponent(msg);
+    await fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${enc}&apikey=${apiKey}`,
+      {mode:'no-cors'});
+    console.log('[WA] sent:', msg);
+  } catch(e) { console.log('[WA] failed:', e); }
+}
+
+async function getWaPhone() {
+  try { const s = await get(ref(db,'config/waPhone')); return s.exists()?s.val():null; } catch(e){return null;}
+}
+async function getWaApiKey() {
+  try { const s = await get(ref(db,'config/waApiKey')); return s.exists()?s.val():null; } catch(e){return null;}
+}
+
 function renderSchedules() {
   const list  = document.getElementById('schList');
   const count = document.getElementById('schCount');
   if(!list) return;
-  count.textContent = `(${schedules.length})`;
-  if(!schedules.length) {
-    list.innerHTML=`<div class="empty"><div class="ei">⏰</div><p>${lang==='ar'?'لا توجد تنبيهات — أضف أول موعد دواء':'No alarms yet. Add your first one!'}</p></div>`;
+
+  // جمّع الجرعات بنفس الاسم + repeat → مجموعة واحدة
+  const groups = {};
+  schedules.forEach(sch => {
+    const gKey = sch.name + '|' + sch.repeat;
+    if(!groups[gKey]) groups[gKey] = { sch, times:[] };
+    groups[gKey].times.push(sch.time);
+    // احتفظ بكل الـ fbKeys لحذف المجموعة
+    if(!groups[gKey].keys) groups[gKey].keys = [];
+    groups[gKey].keys.push(sch.fbKey);
+  });
+
+  const groupArr = Object.values(groups);
+  count.textContent = `(${groupArr.length})`;
+
+  if(!groupArr.length) {
+    list.innerHTML=`<div class="empty"><div class="ei">⏰</div><p>${lang==='ar'?'لا توجد تنبيهات':'No alarms yet'}</p></div>`;
     return;
   }
+
   list.innerHTML='';
-  [...schedules].sort((a,b)=>a.time.localeCompare(b.time)).forEach(sch => {
-    const [h,m] = sch.time.split(':').map(Number);
-    const isPM  = h >= 12;
-    const h12   = h%12||12;
-    const per   = isPM?(lang==='ar'?'م':'PM'):(lang==='ar'?'ص':'AM');
-    const card  = document.createElement('div');
+  groupArr.sort((a,b)=>a.times[0].localeCompare(b.times[0])).forEach(g => {
+    const sch   = g.sch;
+    const times = g.times.sort();
+    // تحويل كل وقت لـ 12h
+    const fmt12 = t => {
+      const [h,m] = t.split(':').map(Number);
+      const isPM  = h>=12;
+      return `${String(h%12||12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${isPM?'PM':'AM'}`;
+    };
+
+    const card = document.createElement('div');
     card.className = 'sch-card';
+
+    // عرض الوقت الأول كبير + باقيها صغيرة
+    const repeatLabel =
+      sch.repeat==='once'  ? (lang==='ar'?'مرة واحدة':'One-time') :
+      sch.repeat==='1x'    ? (lang==='ar'?'يومياً':'Daily') :
+      sch.repeat==='2x'    ? (lang==='ar'?'مرتين يومياً':'Twice/day') :
+      sch.repeat==='3x'    ? (lang==='ar'?'3× يومياً':'3×/day') : sch.repeat;
+
+    const timeBadges = times.map(t =>
+      `<span style="background:rgba(0,212,255,.12);border:1px solid var(--primary);
+        border-radius:6px;padding:2px 7px;font-size:11px;color:var(--primary);">${fmt12(t)}</span>`
+    ).join(' ');
+
+    const keysJson = JSON.stringify(g.keys).replace(/'/g,"\\'");
     card.innerHTML = `
-      <div class="sch-time"><div class="st">${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}</div><div class="sp">${per}</div></div>
+      <div class="sch-time">
+        <div class="st" style="font-size:${times.length>1?'14px':'18px'}">${fmt12(times[0])}</div>
+        ${times.length>1?`<div class="sp" style="font-size:10px;">+${times.length-1} more</div>`:'<div class="sp"></div>'}
+      </div>
       <div class="sch-info">
         <div class="sch-name">${sch.name}</div>
-        <div class="sch-det">${lang==='ar'?'درج':'Drawer'} ${sch.drawer} · ${
-          sch.repeat==='once'?(lang==='ar'?'مرة واحدة فقط':'One-time only'):
-          sch.totalDoses>1?`${lang==='ar'?'جرعة':'Dose'} ${sch.doseIndex||1}/${sch.totalDoses} (${sch.repeat})`:
-          (lang==='ar'?'يومياً':'Daily')
-        }${sch.notes?' · '+sch.notes:''}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">${timeBadges}</div>
+        <div class="sch-det">${lang==='ar'?'درج':'Drawer'} ${sch.drawer} · ${repeatLabel}${sch.notes?' · '+sch.notes:''}</div>
       </div>
-      <button class="sch-del" onclick="deleteSchedule('${sch.fbKey}')">🗑</button>`;
+      <button class="sch-del" onclick="deleteScheduleGroup(${JSON.stringify(g.keys)})">🗑</button>`;
     list.appendChild(card);
   });
 }
@@ -1685,23 +1870,15 @@ function clearSchTimers() { schTimers.forEach(clearInterval); schTimers=[]; }
 function fireAlarm(sch) {
   showToast('🔔', t('medTime'), `${sch.name} — ${lang==='ar'?'درج':'Drawer'} ${sch.drawer}`, 'med');
   const doNotif = () => new Notification(t('medTime'), { body:`${sch.name} — Drawer ${sch.drawer}` });
-  if(Notification.permission === 'granted') {
-    doNotif();
-  } else if(Notification.permission === 'default') {
-    Notification.requestPermission().then(p => { if(p==='granted') doNotif(); });
-  }
+  if(Notification.permission === 'granted') doNotif();
+  else if(Notification.permission === 'default') Notification.requestPermission().then(p=>{if(p==='granted')doNotif();});
+
   const timeText = new Date().toLocaleString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
-  // يكتب لـ alarm (للأردوينو) و medicine (للـ LCD)
-  set(ref(db,'alarm'), {
-    name:sch.name, drawer:sch.drawer, time:sch.time,
-    triggered_at:Date.now(), user:currentUser?.uid||'guest',
-    time_text: timeText, source:'schedule'
-  });
-  set(ref(db,'medicine'), {
-    name:sch.name, drawer:sch.drawer, time:Date.now(),
-    time_text: timeText, source:'schedule',
-    user: currentUser?.uid||'guest'
-  });
+  set(ref(db,'alarm'), { name:sch.name, drawer:sch.drawer, time:sch.time, triggered_at:Date.now(), user:currentUser?.uid||'guest', time_text:timeText, source:'schedule' });
+  set(ref(db,'medicine'), { name:sch.name, drawer:sch.drawer, time:Date.now(), time_text:timeText, source:'schedule', none:false, user:currentUser?.uid||'guest' });
+
+  // واتساب
+  sendWhatsApp(`SmartPharmacy: Time for ${sch.name} - Drawer ${sch.drawer} at ${timeText}`);
 }
 
 /* ════════════════════════════════════════════
@@ -1968,7 +2145,18 @@ function renderMedsSettings() {
   });
 }
 
-window.addMedEntry = function() {
+window.testWhatsApp = async function() {
+  await sendWhatsApp('SmartPharmacy: Test message - Everything is working!');
+  showToast('📤','واتساب','تم إرسال رسالة الاختبار','success');
+};
+
+// تحميل إعدادات واتساب عند فتح الإعدادات
+const _origOpenSettings = window.openSettings;
+window.openSettings = function() {
+  _origOpenSettings && _origOpenSettings();
+  getWaPhone().then(p => { if(p) { const el=document.getElementById('cfgWaPhone'); if(el) el.value=p; } });
+  getWaApiKey().then(k => { if(k) { const el=document.getElementById('cfgWaKey');   if(el) el.value=k; } });
+};
   medicines.push({ id:Date.now(), name:'', drawer:medicines.length+1, aliases:[] });
   renderMedsSettings();
 };
@@ -2002,12 +2190,16 @@ function collectMedsFromInputs() {
 }
 
 window.saveSettingsAndClose = async function() {
-  // اقرأ القيم الحالية من الـ inputs
   medicines = collectMedsFromInputs();
-
-  // احفظ لكل مستخدم بشكل منفصل في Firebase
+  // حفظ واتساب
+  const waPhone = document.getElementById('cfgWaPhone')?.value.trim();
+  const waKey   = document.getElementById('cfgWaKey')?.value.trim();
   if(currentUser?.uid) {
     try {
+      if(waPhone) await set(ref(db,'config/waPhone'), waPhone);
+      if(waKey)   await set(ref(db,'config/waApiKey'), waKey);
+    } catch(e){}
+  }
       await set(ref(db, `users/${currentUser.uid}/medicines`), medicines);
       showToast('✅', lang==='ar'?'تم حفظ الأدوية':'Medicines Saved',
         lang==='ar'?`${medicines.length} دواء محفوظ`:`${medicines.length} medicines saved`, 'success');
@@ -2155,7 +2347,74 @@ async function loadCareHistory() {
 const _origGoPage = window.goPage;
 window.goPage = function(page) {
   _origGoPage(page);
-  if(page === 'care') { loadTodayTaken(); loadCareHistory(); }
+  if(page === 'care') { loadTodayTaken(); loadCareHistory(); loadReport('day'); }
+  if(page === 'schedule') { populateSchedMedDropdown(); }
+};
+
+// ── تقرير الأدوية ────────────────────────────────────────────────
+window.loadReport = async function(period) {
+  if(!currentUser) return;
+  ['rptDay','rptWeek','rptMonth'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b) b.classList.toggle('selected',
+      (period==='day'&&id==='rptDay')||(period==='week'&&id==='rptWeek')||(period==='month'&&id==='rptMonth'));
+  });
+  const box = document.getElementById('reportBox');
+  if(!box) return;
+  box.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-2);">⏳ جاري التحميل...</div>';
+
+  const now = Date.now();
+  const cutoffs = { day:86400000, week:604800000, month:2592000000 };
+  const cutoff  = now - cutoffs[period];
+
+  try {
+    // سجل المحادثات
+    const chatSnap = await get(ref(db, `chatLog/${currentUser.uid}`));
+    const takenSnap= await get(ref(db, `care/${currentUser.uid}/taken`));
+
+    const chats = chatSnap.exists() ? Object.values(chatSnap.val()).filter(x=>x.ts>cutoff) : [];
+    const taken = takenSnap.exists()? Object.values(takenSnap.val()).filter(x=>x.ts*1000>cutoff) : [];
+
+    // إحصاءات
+    const totalRequests = chats.length;
+    const fulfilled     = chats.filter(c=>!c.isNone).length;
+    const missed        = chats.filter(c=>c.isNone).length;
+    const takenCount    = taken.length;
+
+    // تجميع بالدواء
+    const byMed = {};
+    chats.filter(c=>!c.isNone).forEach(c=>{
+      byMed[c.medicine] = (byMed[c.medicine]||0)+1;
+    });
+    const medRows = Object.entries(byMed)
+      .sort((a,b)=>b[1]-a[1])
+      .map(([name,cnt])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+        <span>💊 ${name}</span><span style="color:var(--primary);font-weight:700;">${cnt}×</span></div>`)
+      .join('');
+
+    // أوقات الأخذ
+    const takenRows = taken.slice(0,10).map(t=>
+      `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">
+        <span>✅ ${t.name}</span><span style="font-size:11px;color:var(--text-2);">${t.date} ${t.time}</span></div>`
+    ).join('');
+
+    const periodLabel = period==='day'?'آخر 24 ساعة':period==='week'?'آخر 7 أيام':'آخر 30 يوماً';
+
+    box.innerHTML = `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">📅 ${periodLabel}</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="sv">${totalRequests}</div><div class="sl">طلبات الدواء</div></div>
+          <div class="stat-card"><div class="sv" style="color:var(--green);">${fulfilled}</div><div class="sl">تم التوفير</div></div>
+          <div class="stat-card"><div class="sv" style="color:#f97316;">${missed}</div><div class="sl">لم يُوجد</div></div>
+          <div class="stat-card"><div class="sv" style="color:var(--primary);">${takenCount}</div><div class="sl">تم الأخذ ✅</div></div>
+        </div>
+      </div>
+      ${medRows?`<div class="card" style="margin-bottom:12px;"><h4 style="margin:0 0 10px;font-size:13px;">الأدوية الأكثر طلباً</h4>${medRows}</div>`:''}
+      ${takenRows?`<div class="card"><h4 style="margin:0 0 10px;font-size:13px;">آخر الجرعات المأخوذة</h4>${takenRows}</div>`:''}`;
+  } catch(e) {
+    box.innerHTML = `<div class="empty"><p>تعذّر تحميل التقرير</p></div>`;
+  }
 };
 
 /* ════════════════════════════════════════════
