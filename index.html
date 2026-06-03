@@ -952,22 +952,47 @@ button,input,textarea,select{font-family:inherit}
         <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">يمكن وضع أكثر من دواء في نفس الدرج — حدد رقم الدرج (1-4)</p>
         <div id="medsSettingsList"></div>
       </div>
-      <!-- WHATSAPP -->
+      <!-- WIFI SETTINGS -->
       <div class="set-sec">
-        <h4>📱 WhatsApp (CallMeBot)</h4>
+        <h4>📶 WiFi Settings (ESP32)</h4>
+        <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">
+          سيتم إرسال الإعدادات للـ ESP32 — سيعيد الاتصال تلقائياً
+        </p>
         <div class="fgrid">
           <div class="ff full">
-            <label>رقم الواتساب</label>
-            <input id="cfgWaPhone" type="tel" placeholder="00972594785696"
+            <label>Network Name (SSID)</label>
+            <input id="cfgWifiSSID" type="text" placeholder="HOSAM 2.4g"
+              style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;" dir="ltr">
+          </div>
+          <div class="ff full">
+            <label>Password</label>
+            <input id="cfgWifiPass" type="password" placeholder="••••••••"
+              style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;" dir="ltr">
+          </div>
+          <div class="ff full">
+            <button class="btn-ghost" style="font-size:12px;" onclick="saveWiFiSettings()">
+              📶 حفظ وإرسال للـ ESP32
+            </button>
+          </div>
+        </div>
+      </div>
+            <!-- TELEGRAM -->
+      <div class="set-sec">
+        <h4>📨 Telegram (CallMeBot)</h4>
+        <div class="fgrid">
+          <div class="ff full">
+            <label>Telegram Username (بدون @)</label>
+            <input id="cfgTgUser" type="text" placeholder="hosam_zaqout"
               style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;" dir="ltr">
           </div>
           <div class="ff full">
             <label>CallMeBot API Key</label>
-            <input id="cfgWaKey" type="text" placeholder="أرسل 'I allow callmebot...' لـ wa.me/+34684875248"
+            <input id="cfgTgKey" type="text" placeholder="من @CallMeBot_txtbot"
               style="width:100%;padding:10px 12px;background:var(--bg-in);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:13px;" dir="ltr">
           </div>
-          <div class="ff full">
-            <button class="btn-ghost" style="font-size:12px;" onclick="testWhatsApp()">📤 إرسال رسالة اختبار</button>
+          <div class="ff full" style="display:flex;gap:8px;">
+            <button class="btn-ghost" style="font-size:12px;flex:1;" onclick="saveTgSettings()">💾 حفظ</button>
+            <button class="btn-ghost" style="font-size:12px;flex:1;" onclick="testTelegram()">📤 اختبار</button>
           </div>
         </div>
       </div>
@@ -1474,9 +1499,9 @@ Available medicines (multiple medicines can share the same drawer):
 ${medList}
 
 User describes symptoms → find BEST matching medicine → respond ONLY as:
-medicine:EXACT_NAME
+medicine:ENGLISH_SCIENTIFIC_NAME   (always the English/Latin name, never Arabic)
 drawer:NUMBER
-description:BRIEF_EXPLANATION
+description:BRIEF_EXPLANATION_in_same_language_as_user
 
 If no match:
 medicine:none
@@ -2150,12 +2175,51 @@ window.testWhatsApp = async function() {
   showToast('📤','واتساب','تم إرسال رسالة الاختبار','success');
 };
 
+// ── WiFi Settings ─────────────────────────────────────────────────
+window.saveWiFiSettings = async function() {
+  const ssid = document.getElementById('cfgWifiSSID')?.value.trim();
+  const pass = document.getElementById('cfgWifiPass')?.value;
+  if(!ssid){ showToast('⚠️','خطأ','أدخل اسم الشبكة',''); return; }
+  try {
+    await set(ref(db,'config/wifiSSID'), ssid);
+    if(pass) await set(ref(db,'config/wifiPASS'), pass);
+    showToast('📶','WiFi','تم الحفظ — سيتصل ESP32 تلقائياً','success');
+  } catch(e){ showToast('⚠️','خطأ',e.message,''); }
+};
+
+// ── Telegram Settings ─────────────────────────────────────────────
+window.saveTgSettings = async function() {
+  const user = document.getElementById('cfgTgUser')?.value.trim();
+  const key  = document.getElementById('cfgTgKey')?.value.trim();
+  try {
+    if(user) await set(ref(db,'config/tgUsername'), user);
+    if(key)  await set(ref(db,'config/tgApiKey'),   key);
+    showToast('📨','Telegram','تم الحفظ','success');
+  } catch(e){ showToast('⚠️','خطأ',e.message,''); }
+};
+
+window.testTelegram = async function() {
+  const user = document.getElementById('cfgTgUser')?.value.trim();
+  const key  = document.getElementById('cfgTgKey')?.value.trim();
+  if(!user||!key){ showToast('⚠️','','أدخل Username والـ API Key أولاً',''); return; }
+  const msg = 'SmartPharmacy: Test message OK!';
+  const enc = msg.split(' ').join('+');
+  const url = `https://api.callmebot.com/text.php?source=web&user=%40${user}&text=${enc}&apikey=${key}`;
+  try{
+    await fetch(url,{mode:'no-cors'});
+    showToast('📤','Telegram','تم إرسال رسالة الاختبار','success');
+  }catch(e){ showToast('⚠️','خطأ','تحقق من الإعدادات',''); }
+};
+
 // تحميل إعدادات واتساب عند فتح الإعدادات
 const _origOpenSettings = window.openSettings;
 window.openSettings = function() {
   _origOpenSettings && _origOpenSettings();
-  getWaPhone().then(p  => { if(p) { const el=document.getElementById('cfgWaPhone'); if(el) el.value=p; } });
-  getWaApiKey().then(k => { if(k) { const el=document.getElementById('cfgWaKey');   if(el) el.value=k; } });
+  // Telegram
+  get(ref(db,'config/tgUsername')).then(s=>{if(s.exists()){const el=document.getElementById('cfgTgUser');if(el)el.value=s.val();}}).catch(()=>{});
+  get(ref(db,'config/tgApiKey')).then(s=>{if(s.exists()){const el=document.getElementById('cfgTgKey');if(el)el.value=s.val();}}).catch(()=>{});
+  // WiFi (SSID فقط، مش الباسورد)
+  get(ref(db,'config/wifiSSID')).then(s=>{if(s.exists()){const el=document.getElementById('cfgWifiSSID');if(el)el.value=s.val();}}).catch(()=>{});
 };
 
 window.addMedEntry = function() {
