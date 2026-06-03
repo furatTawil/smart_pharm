@@ -771,7 +771,7 @@ button,input,textarea,select{font-family:inherit}
         </div>
         <div class="health-body">
           <div class="health-hero">
-            <h2 id="healthHeroTitle">🌿 صحتك تهمنا</h2>
+            <h2 id="healthHeroTitle">🌿 Your Health Matters</h2>
             <p id="healthHeroText">استشر طبيبك قبل تناول أي دواء. المعلومات هنا للتوعية العامة فقط وليست بديلاً عن الرأي الطبي المتخصص.</p>
           </div>
           <div class="hgrid" id="healthGrid"></div>
@@ -1667,40 +1667,46 @@ async function loadSchedules() {
 }
 
 window.addSchedule = async function() {
-  const name   = document.getElementById('sMed').value.trim();
+  const medSel = document.getElementById('sMed');
+  const name   = medSel ? medSel.value.trim() : '';
   const drawer = parseInt(document.getElementById('sDrw').value)||0;
   const time   = document.getElementById('sTime').value;
   const repeat = document.getElementById('sRep').value;
   const notes  = document.getElementById('sNote').value.trim();
-  if(!name || !time) return;
+  if(!name || !time) {
+    showToast('⚠️', lang==='ar'?'تنبيه':'Notice',
+      lang==='ar'?'اختر دواء وحدد الوقت':'Select medicine and set time', '');
+    return;
+  }
 
   // حساب المواعيد بناءً على عدد الجرعات
   let times = [time];
   if(repeat === '2x') {
-    // جرعتين: الأولى + بعد 12 ساعة
     const [h,m] = time.split(':').map(Number);
-    const h2 = (h + 12) % 24;
-    times.push(`${String(h2).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    times.push(`${String((h+12)%24).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
   } else if(repeat === '3x') {
-    // 3 جرعات: الأولى + بعد 8 + بعد 16
     const [h,m] = time.split(':').map(Number);
-    const h2 = (h + 8) % 24;
-    const h3 = (h + 16) % 24;
-    times.push(`${String(h2).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
-    times.push(`${String(h3).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    times.push(`${String((h+8)%24).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    times.push(`${String((h+16)%24).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
   }
 
   try {
     for(let i=0; i<times.length; i++) {
-      const sch = { name, drawer, time:times[i], repeat, doseIndex:i+1, totalDoses:times.length, notes, active:true, createdAt:Date.now() };
+      const sch = { name, drawer, time:times[i], repeat,
+        doseIndex:i+1, totalDoses:times.length,
+        notes, active:true, createdAt:Date.now() };
       const newRef = push(ref(db, `schedules/${currentUser.uid}`));
       await set(newRef, sch);
       sch.fbKey = newRef.key;
       schedules.push(sch);
     }
     renderSchedules();
-    ['sMed','sDrw','sTime','sNote'].forEach(id => document.getElementById(id).value='');
-    const label = repeat==='2x'?'جرعتان':'repeat'==='3x'?'3 جرعات':'جرعة واحدة';
+    // reset form
+    if(medSel) medSel.value = '';
+    document.getElementById('sDrw').value  = '';
+    document.getElementById('sTime').value = '';
+    document.getElementById('sNote').value = '';
+    document.getElementById('calcTimesBox').style.display = 'none';
     showToast('⏰', lang==='ar'?'تم إضافة التنبيه':'Alarm Added',
       `${name} — ${times.join(', ')}`, 'success');
   } catch(e) {
@@ -1788,23 +1794,21 @@ function updateCalcTimes() {
 }
 
 // ── WhatsApp Send ──────────────────────────────────────────────────
-async function sendWhatsApp(msg) {
+// ── Telegram Send (من الويب) ───────────────────────────────────────
+async function sendTelegramFromWeb(msg) {
   try {
-    const phone = await getWaPhone();
-    const apiKey = await getWaApiKey();
-    if(!phone || !apiKey) return;
-    const enc = encodeURIComponent(msg);
-    await fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${enc}&apikey=${apiKey}`,
-      {mode:'no-cors'});
-    console.log('[WA] sent:', msg);
-  } catch(e) { console.log('[WA] failed:', e); }
-}
-
-async function getWaPhone() {
-  try { const s = await get(ref(db,'config/waPhone')); return s.exists()?s.val():null; } catch(e){return null;}
-}
-async function getWaApiKey() {
-  try { const s = await get(ref(db,'config/waApiKey')); return s.exists()?s.val():null; } catch(e){return null;}
+    const [userSnap, keySnap] = await Promise.all([
+      get(ref(db,'config/tgUsername')),
+      get(ref(db,'config/tgApiKey'))
+    ]);
+    const user = userSnap.exists() ? userSnap.val() : null;
+    const key  = keySnap.exists()  ? keySnap.val()  : null;
+    if(!user || !key) return;
+    const enc = encodeURIComponent(msg).replace(/%20/g,'+');
+    const url = `https://api.callmebot.com/text.php?source=web&user=%40${user}&text=${enc}&apikey=${key}`;
+    await fetch(url, {mode:'no-cors'});
+    console.log('[TG] sent:', msg);
+  } catch(e) { console.log('[TG] error:', e); }
 }
 
 function renderSchedules() {
@@ -1857,7 +1861,7 @@ function renderSchedules() {
         border-radius:6px;padding:2px 7px;font-size:11px;color:var(--primary);">${fmt12(t)}</span>`
     ).join(' ');
 
-    const keysJson = JSON.stringify(g.keys).replace(/'/g,"\\'");
+    const cardId = 'sc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     card.innerHTML = `
       <div class="sch-time">
         <div class="st" style="font-size:${times.length>1?'14px':'18px'}">${fmt12(times[0])}</div>
@@ -1868,7 +1872,13 @@ function renderSchedules() {
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">${timeBadges}</div>
         <div class="sch-det">${lang==='ar'?'درج':'Drawer'} ${sch.drawer} · ${repeatLabel}${sch.notes?' · '+sch.notes:''}</div>
       </div>
-      <button class="sch-del" onclick="deleteScheduleGroup(${JSON.stringify(g.keys)})">🗑</button>`;
+      <button class="sch-del" data-card="${cardId}">🗑</button>`;
+    // احفظ الـ keys في dataset بدل inline JSON
+    card.dataset.keys = JSON.stringify(g.keys);
+    card.querySelector('.sch-del').addEventListener('click', () => {
+      const keys = JSON.parse(card.dataset.keys);
+      deleteScheduleGroup(keys);
+    });
     list.appendChild(card);
   });
 }
@@ -1876,18 +1886,30 @@ function renderSchedules() {
 /* Schedule checker */
 function startSchChecker() {
   clearSchTimers();
+  let lastFired = {};   // يمنع تكرار نفس الموعد في نفس الدقيقة
   const check = () => {
     const now  = new Date();
     const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const today = now.toDateString();
     schedules.forEach(sch => {
-      if(sch.time===hhmm && sch.active) {
-        fireAlarm(sch);
-        if(sch.repeat==='once') sch.active=false;
+      if(sch.time === hhmm && sch.active) {
+        const fireKey = `${sch.fbKey||sch.name}_${today}_${hhmm}`;
+        if(!lastFired[fireKey]) {
+          lastFired[fireKey] = true;
+          fireAlarm(sch);
+          if(sch.repeat === 'once') sch.active = false;
+        }
       }
     });
+    // تنظيف lastFired من الأيام القديمة
+    Object.keys(lastFired).forEach(k => { if(!k.includes(today)) delete lastFired[k]; });
   };
-  check();
-  schTimers.push(setInterval(check, 60000));
+  // لا تشغّل check() فوراً — انتظر أول دقيقة كاملة
+  const msToNextMin = (60 - new Date().getSeconds()) * 1000;
+  schTimers.push(setTimeout(() => {
+    check();
+    schTimers.push(setInterval(check, 60000));
+  }, msToNextMin));
 }
 
 function clearSchTimers() { schTimers.forEach(clearInterval); schTimers=[]; }
@@ -1902,8 +1924,8 @@ function fireAlarm(sch) {
   set(ref(db,'alarm'), { name:sch.name, drawer:sch.drawer, time:sch.time, triggered_at:Date.now(), user:currentUser?.uid||'guest', time_text:timeText, source:'schedule' });
   set(ref(db,'medicine'), { name:sch.name, drawer:sch.drawer, time:Date.now(), time_text:timeText, source:'schedule', none:false, user:currentUser?.uid||'guest' });
 
-  // واتساب
-  sendWhatsApp(`SmartPharmacy: Time for ${sch.name} - Drawer ${sch.drawer} at ${timeText}`);
+  // Telegram
+  sendTelegramFromWeb(`SmartPharmacy: Time for ${sch.name} - Drawer ${sch.drawer} at ${timeText}`);
 }
 
 /* ════════════════════════════════════════════
